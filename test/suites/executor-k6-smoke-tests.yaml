@@ -16,3 +16,6 @@ spec:
   - stopOnFailure: false
     execute:
     - test: k6-executor-smoke-negative
+  - stopOnFailure: false
+    execute:
+    - test: k6-executor-smoke-string
