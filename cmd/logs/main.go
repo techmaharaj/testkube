@@ -10,7 +10,6 @@ import (
 
 	"github.com/nats-io/nats.go/jetstream"
 	"github.com/oklog/run"
-	"go.uber.org/zap"
 	"google.golang.org/grpc/credentials"
 
 	"github.com/kubeshop/testkube/internal/common"
@@ -42,7 +41,10 @@ func newStorageClient(cfg *config.Config) *minio.Client {
 }
 
 func main() {
-	var g run.Group
+	var (
+		g           run.Group
+		minioClient *minio.Client
+	)
 
 	log := log.DefaultLogger.With("service", "logs-service-init")
 
@@ -72,15 +74,6 @@ func main() {
 
 	js := Must(jetstream.New(nc))
 	logStream := Must(client.NewNatsLogStream(nc))
-
-	minioClient := newStorageClient(cfg)
-	if err := minioClient.Connect(); err != nil {
-		log.Fatalw("error connecting to minio", "error", err)
-	}
-
-	if err := minioClient.SetExpirationPolicy(cfg.StorageExpiration); err != nil {
-		log.Warnw("error setting expiration policy", "error", err)
-	}
 
 	kv := Must(js.CreateKeyValue(ctx, jetstream.KeyValueConfig{Bucket: cfg.KVBucketName}))
 	state := state.NewState(kv)
@@ -116,6 +109,15 @@ func main() {
 		svc.AddAdapter(cloudAdapter)
 
 	case common.ModeStandalone:
+		minioClient := newStorageClient(cfg)
+		if err := minioClient.Connect(); err != nil {
+			log.Fatalw("error connecting to minio", "error", err)
+		}
+
+		if err := minioClient.SetExpirationPolicy(cfg.StorageExpiration); err != nil {
+			log.Warnw("error setting expiration policy", "error", err)
+		}
+
 		minioAdapter, err := adapter.NewMinioAdapter(cfg.StorageEndpoint,
 			cfg.StorageAccessKeyID,
 			cfg.StorageSecretAccessKey,
@@ -136,7 +138,7 @@ func main() {
 	}
 
 	g.Add(func() error {
-		err := interrupt(log, ctx)
+		err := interrupt(ctx)
 		return err
 	}, func(error) {
 		log.Warnf("interrupt signal received, canceling context")
@@ -173,7 +175,7 @@ func main() {
 	log.Infof("exiting")
 }
 
-func interrupt(logger *zap.SugaredLogger, ctx context.Context) error {
+func interrupt(ctx context.Context) error {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
 	select {

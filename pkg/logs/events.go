@@ -93,6 +93,7 @@ func (ls *LogsService) handleMessage(ctx context.Context, a adapter.Adapter, id 
 				log.Errorw("error nacking message", "error", err)
 				return
 			}
+			log.Errorw("error notifying adapter", "error", err, "adapter", a.Name())
 			return
 		}
 
@@ -278,7 +279,7 @@ func (ls *LogsService) stopConsumer(ctx context.Context, wg *sync.WaitGroup, con
 		// retry if there is no messages processed as there could be slower logs
 		retries++
 		if retries >= maxRetries {
-			l.Errorw("error stopping consumer", "error", err, "name", consumer.Name, "consumerSeq", info.Delivered.Consumer, "streamSeq", info.Delivered.Stream, "last", info.Delivered.Last)
+			l.Errorw("error stopping consumer", "error", "max retries to stop consumer", "name", consumer.Name, "consumerSeq", info.Delivered.Consumer, "streamSeq", info.Delivered.Stream, "last", info.Delivered.Last)
 			return
 		}
 

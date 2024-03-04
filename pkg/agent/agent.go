@@ -56,7 +56,7 @@ func NewGRPCConnection(ctx context.Context, isInsecure bool, skipVerify bool, se
 
 	kacp := keepalive.ClientParameters{
 		Time:                10 * time.Second,
-		Timeout:             5 * time.Second,
+		Timeout:             20 * time.Second,
 		PermitWithoutStream: true,
 	}
 
