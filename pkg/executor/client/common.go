@@ -46,7 +46,10 @@ type PVCOptions struct {
 	Namespace             string
 	PvcTemplate           string
 	PvcTemplateExtensions string
-	ArtifactRequest       *testkube.ArtifactRequest
+	// Deprecated: use VolumeRequest instead
+	ArtifactRequest *testkube.ArtifactRequest
+	// Global Volume request for test
+	VolumeRequest *testkube.VolumeRequest
 }
 
 // NewPersistentVolumeClaimSpec is a method to create new persistent volume claim spec

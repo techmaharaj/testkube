@@ -195,6 +195,11 @@ type JobOptions struct {
 	Features              featureflags.FeatureFlags
 	PvcTemplate           string
 	PvcTemplateExtensions string
+
+	// Global volume is a volume that is shared between all pods in the namespace
+	GlobalVolume bool
+	// VolumeReqest for configuring PVC
+	VolumeRequest *testkube.VolumeRequest
 }
 
 // Logs returns job logs stream channel using kubernetes api
@@ -338,7 +343,20 @@ func (c *JobExecutor) CreateJob(ctx context.Context, execution testkube.Executio
 		return err
 	}
 
-	if jobOptions.ArtifactRequest != nil &&
+	if jobOptions.GlobalVolume {
+		pvcOptions := NewPVCOptionsFromJobOptions(jobOptions)
+		c.Log.Debug("creating global persistent volume claim with options", "options", pvcOptions)
+		pvcsClient := c.ClientSet.CoreV1().PersistentVolumeClaims(execution.TestNamespace)
+		pvcSpec, err := NewPersistentVolumeClaimSpec(c.Log, pvcOptions)
+		if err != nil {
+			return err
+		}
+
+		_, err = pvcsClient.Create(ctx, pvcSpec, metav1.CreateOptions{})
+		if err != nil {
+			return err
+		}
+	} else if jobOptions.ArtifactRequest != nil &&
 		jobOptions.ArtifactRequest.StorageClassName != "" {
 		c.Log.Debug("creating persistent volume claim with options", "options", jobOptions)
 		pvcsClient := c.ClientSet.CoreV1().PersistentVolumeClaims(execution.TestNamespace)
@@ -1051,5 +1069,6 @@ func NewPVCOptionsFromJobOptions(options JobOptions) PVCOptions {
 		PvcTemplate:           options.PvcTemplate,
 		PvcTemplateExtensions: options.PvcTemplateExtensions,
 		ArtifactRequest:       options.ArtifactRequest,
+		VolumeRequest:         options.VolumeRequest,
 	}
 }
