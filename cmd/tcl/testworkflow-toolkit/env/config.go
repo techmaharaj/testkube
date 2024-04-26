@@ -56,7 +56,7 @@ type envImagesConfig struct {
 	Init                         string `envconfig:"TK_IMG_INIT"`
 	Toolkit                      string `envconfig:"TK_IMG_TOOLKIT"`
 	InspectorPersistenceEnabled  bool   `envconfig:"TK_IMG_P" default:"false"`
-	InspectorPersistenceCacheKey bool   `envconfig:"TK_IMG_PK"`
+	InspectorPersistenceCacheKey string `envconfig:"TK_IMG_PK"`
 }
 
 type envConfig struct {
