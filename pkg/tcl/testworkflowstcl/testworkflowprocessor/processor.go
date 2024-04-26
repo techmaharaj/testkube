@@ -60,7 +60,8 @@ func NewFullFeatured(inspector imageinspector.Inspector) Processor {
 		Register(ProcessShellCommand).
 		Register(ProcessExecute).
 		Register(ProcessNestedSteps).
-		Register(ProcessArtifacts)
+		Register(ProcessArtifacts).
+		Register(ProcessParallel)
 }
 
 func (p *processor) Register(operation Operation) Processor {
@@ -120,6 +121,9 @@ func (p *processor) Bundle(ctx context.Context, workflow *testworkflowsv1.TestWo
 		AppendVolumeMounts(layer.AddEmptyDirVolume(nil, constants.DefaultInternalPath)).
 		AppendVolumeMounts(layer.AddEmptyDirVolume(nil, constants.DefaultDataPath))
 
+	// Add resourceSuffix fallback for machines
+	machines = append(machines, expressionstcl.NewMachine().Register("resourceSuffix", ""))
+
 	// Process steps
 	rootStep := testworkflowsv1.Step{
 		StepBase: testworkflowsv1.StepBase{
@@ -174,7 +178,7 @@ func (p *processor) Bundle(ctx context.Context, workflow *testworkflowsv1.TestWo
 	// Append main label for the pod
 	layer.AppendPodConfig(&testworkflowsv1.PodConfig{
 		Labels: map[string]string{
-			constants.ExecutionIdMainPodLabelName: "{{execution.id}}",
+			constants.ExecutionIdMainPodLabelName: "{{execution.id}}{{resourceSuffix}}",
 		},
 	})
 
@@ -310,7 +314,7 @@ func (p *processor) Bundle(ctx context.Context, workflow *testworkflowsv1.TestWo
 			APIVersion: batchv1.SchemeGroupVersion.String(),
 		},
 		ObjectMeta: metav1.ObjectMeta{
-			Name:        "{{execution.id}}",
+			Name:        "{{execution.id}}{{resourceSuffix}}", // TODO: Add resourceSuffix in other places too
 			Annotations: jobConfig.Annotations,
 			Labels:      jobConfig.Labels,
 		},
