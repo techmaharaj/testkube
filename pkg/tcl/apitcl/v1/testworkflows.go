@@ -20,7 +20,6 @@ import (
 	"github.com/gofiber/fiber/v2"
 	"github.com/pkg/errors"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"sigs.k8s.io/kustomize/kyaml/yaml"
 
 	testworkflowsv1 "github.com/kubeshop/testkube-operator/api/testworkflows/v1"
 	"github.com/kubeshop/testkube/internal/common"
@@ -301,7 +300,7 @@ func (s *apiTCL) ExecuteTestWorkflowHandler() fiber.Handler {
 		}
 
 		// Fetch the global template
-		globalTemplateStr := ""
+		globalTemplateRef := testworkflowsv1.TemplateRef{}
 		if s.GlobalTemplateName != "" {
 			internalName := testworkflowresolver.GetInternalTemplateName(s.GlobalTemplateName)
 			displayName := testworkflowresolver.GetDisplayTemplateName(s.GlobalTemplateName)
@@ -315,11 +314,8 @@ func (s *apiTCL) ExecuteTestWorkflowHandler() fiber.Handler {
 				}
 			}
 			if _, ok := tplsMap[internalName]; ok {
-				workflow.Spec.Use = append([]testworkflowsv1.TemplateRef{{Name: displayName}}, workflow.Spec.Use...)
-				b, err := yaml.Marshal(tplsMap[internalName])
-				if err == nil {
-					globalTemplateStr = string(b)
-				}
+				globalTemplateRef = testworkflowsv1.TemplateRef{Name: displayName}
+				workflow.Spec.Use = append([]testworkflowsv1.TemplateRef{globalTemplateRef}, workflow.Spec.Use...)
 			}
 		}
 
@@ -333,6 +329,16 @@ func (s *apiTCL) ExecuteTestWorkflowHandler() fiber.Handler {
 		err = testworkflowresolver.ApplyTemplates(workflow, tplsMap)
 		if err != nil {
 			return s.BadRequest(c, errPrefix, "resolving error", err)
+		}
+
+		// Apply global template to parallel steps
+		if globalTemplateRef.Name != "" {
+			testworkflowresolver.AddGlobalTemplateRef(workflow, globalTemplateRef)
+			workflow.Spec.Use = nil
+			err = testworkflowresolver.ApplyTemplates(workflow, tplsMap)
+			if err != nil {
+				return s.BadRequest(c, errPrefix, "resolving with global templates error", err)
+			}
 		}
 
 		// Build the basic Execution data
@@ -358,10 +364,9 @@ func (s *apiTCL) ExecuteTestWorkflowHandler() fiber.Handler {
 				"cloud.api.skipVerify":  common.GetOr(os.Getenv("TESTKUBE_PRO_SKIP_VERIFY"), os.Getenv("TESTKUBE_CLOUD_SKIP_VERIFY"), "false"),
 				"cloud.api.url":         common.GetOr(os.Getenv("TESTKUBE_PRO_URL"), os.Getenv("TESTKUBE_CLOUD_URL")),
 
-				"dashboard.url":  os.Getenv("TESTKUBE_DASHBOARD_URI"),
-				"api.url":        s.ApiUrl,
-				"namespace":      s.Namespace,
-				"globalTemplate": globalTemplateStr,
+				"dashboard.url": os.Getenv("TESTKUBE_DASHBOARD_URI"),
+				"api.url":       s.ApiUrl,
+				"namespace":     s.Namespace,
 
 				"images.init":    constants.DefaultInitImage,
 				"images.toolkit": constants.DefaultToolkitImage,

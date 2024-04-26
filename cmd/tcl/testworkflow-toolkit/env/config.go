@@ -40,9 +40,8 @@ type envCloudConfig struct {
 }
 
 type envExecutionConfig struct {
-	WorkflowName   string `envconfig:"TK_WF"`
-	Id             string `envconfig:"TK_EX"`
-	GlobalTemplate string `envconfig:"TK_TMPL"`
+	WorkflowName string `envconfig:"TK_WF"`
+	Id           string `envconfig:"TK_EX"`
 }
 
 type envSystemConfig struct {
