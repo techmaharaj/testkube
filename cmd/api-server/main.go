@@ -585,6 +585,9 @@ func main() {
 		testWorkflowOutputRepository,
 		"http://"+cfg.APIServerFullname+":"+cfg.APIServerPort,
 		cfg.GlobalWorkflowTemplateName,
+		cfg.TestkubeRegistry,
+		cfg.EnableImageDataPersistentCache,
+		cfg.ImageDataPersistentCacheKey,
 		configMapConfig,
 	)
 	apiPro.AppendRoutes()

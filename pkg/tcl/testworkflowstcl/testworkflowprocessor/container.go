@@ -417,6 +417,7 @@ func (c *container) EnableToolkit(ref string) Container {
 		AppendEnvMap(map[string]string{
 			"TK_REF":                ref,
 			"TK_NS":                 "{{internal.namespace}}",
+			"TK_R":                  "{{internal.defaultRegistry}}",
 			"TK_WF":                 "{{workflow.name}}",
 			"TK_EX":                 "{{execution.id}}",
 			"TK_C_URL":              "{{internal.cloud.api.url}}",
@@ -436,6 +437,8 @@ func (c *container) EnableToolkit(ref string) Container {
 			"TK_OS_CA_FILE":         "{{internal.storage.caFile}}",
 			"TK_IMG_TOOLKIT":        "{{internal.images.toolkit}}",
 			"TK_IMG_INIT":           "{{internal.images.init}}",
+			"TK_IMG_P":              "{{internal.images.persistence.enabled}}",
+			"TK_IMG_PK":             "{{internal.images.persistence.key}}",
 		})
 }
 

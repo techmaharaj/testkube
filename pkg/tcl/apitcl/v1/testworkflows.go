@@ -364,12 +364,15 @@ func (s *apiTCL) ExecuteTestWorkflowHandler() fiber.Handler {
 				"cloud.api.skipVerify":  common.GetOr(os.Getenv("TESTKUBE_PRO_SKIP_VERIFY"), os.Getenv("TESTKUBE_CLOUD_SKIP_VERIFY"), "false"),
 				"cloud.api.url":         common.GetOr(os.Getenv("TESTKUBE_PRO_URL"), os.Getenv("TESTKUBE_CLOUD_URL")),
 
-				"dashboard.url": os.Getenv("TESTKUBE_DASHBOARD_URI"),
-				"api.url":       s.ApiUrl,
-				"namespace":     s.Namespace,
+				"dashboard.url":   os.Getenv("TESTKUBE_DASHBOARD_URI"),
+				"api.url":         s.ApiUrl,
+				"namespace":       s.Namespace,
+				"defaultRegistry": s.DefaultRegistry,
 
-				"images.init":    constants.DefaultInitImage,
-				"images.toolkit": constants.DefaultToolkitImage,
+				"images.init":                constants.DefaultInitImage,
+				"images.toolkit":             constants.DefaultToolkitImage,
+				"images.persistence.enabled": strconv.FormatBool(s.EnableImageDataPersistentCache),
+				"images.persistence.key":     s.ImageDataPersistentCacheKey,
 			}).
 			RegisterStringMap("workflow", map[string]string{
 				"name": workflow.Name,

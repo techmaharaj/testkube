@@ -45,15 +45,18 @@ type envExecutionConfig struct {
 }
 
 type envSystemConfig struct {
-	Debug     string `envconfig:"DEBUG"`
-	Ref       string `envconfig:"TK_REF"`
-	Namespace string `envconfig:"TK_NS"`
-	Ip        string `envconfig:"TK_IP"`
+	Debug           string `envconfig:"DEBUG"`
+	Ref             string `envconfig:"TK_REF"`
+	Namespace       string `envconfig:"TK_NS"`
+	DefaultRegistry string `envconfig:"TK_R"`
+	Ip              string `envconfig:"TK_IP"`
 }
 
 type envImagesConfig struct {
-	Init    string `envconfig:"TK_IMG_INIT"`
-	Toolkit string `envconfig:"TK_IMG_TOOLKIT"`
+	Init                         string `envconfig:"TK_IMG_INIT"`
+	Toolkit                      string `envconfig:"TK_IMG_TOOLKIT"`
+	InspectorPersistenceEnabled  bool   `envconfig:"TK_IMG_P" default:"false"`
+	InspectorPersistenceCacheKey bool   `envconfig:"TK_IMG_PK"`
 }
 
 type envConfig struct {
