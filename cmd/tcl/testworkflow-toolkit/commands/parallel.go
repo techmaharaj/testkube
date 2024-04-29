@@ -29,10 +29,6 @@ import (
 	"github.com/kubeshop/testkube/cmd/tcl/testworkflow-toolkit/env"
 	"github.com/kubeshop/testkube/cmd/tcl/testworkflow-toolkit/transfer"
 	"github.com/kubeshop/testkube/pkg/api/v1/testkube"
-	"github.com/kubeshop/testkube/pkg/configmap"
-	"github.com/kubeshop/testkube/pkg/imageinspector"
-	"github.com/kubeshop/testkube/pkg/log"
-	"github.com/kubeshop/testkube/pkg/secret"
 	"github.com/kubeshop/testkube/pkg/tcl/expressionstcl"
 	"github.com/kubeshop/testkube/pkg/tcl/testworkflowstcl/testworkflowcontroller"
 	"github.com/kubeshop/testkube/pkg/tcl/testworkflowstcl/testworkflowprocessor"
@@ -219,24 +215,9 @@ func NewParallelCmd() *cobra.Command {
 				})
 			}
 
-			// Load Kubernetes configuration
+			// Load Kubernetes client and image inspector
 			clientSet := env.Kubernetes()
-
-			// Prepare the image inspector
-			secretClient := &secret.Client{ClientSet: clientSet, Namespace: env.Namespace(), Log: log.DefaultLogger}
-			configMapClient := &configmap.Client{ClientSet: clientSet, Namespace: env.Namespace(), Log: log.DefaultLogger}
-			inspectorStorages := []imageinspector.Storage{imageinspector.NewMemoryStorage()}
-			if env.Config().Images.InspectorPersistenceEnabled {
-				configmapStorage := imageinspector.NewConfigMapStorage(configMapClient, env.Config().Images.InspectorPersistenceCacheKey, true)
-				_ = configmapStorage.CopyTo(context.Background(), inspectorStorages[0].(imageinspector.StorageTransfer))
-				inspectorStorages = append(inspectorStorages, configmapStorage)
-			}
-			inspector := imageinspector.NewInspector(
-				env.Config().System.DefaultRegistry,
-				imageinspector.NewSkopeoFetcher(),
-				imageinspector.NewSecretFetcher(secretClient),
-				inspectorStorages...,
-			)
+			inspector := env.ImageInspector()
 
 			// Prepare runner
 			// TODO: Share resources like configMaps?
