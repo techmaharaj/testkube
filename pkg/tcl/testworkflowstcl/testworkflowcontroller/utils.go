@@ -364,7 +364,7 @@ func WatchJobPreEvents(ctx context.Context, jobEvents Watcher[*corev1.Event], ca
 			case v := <-stream.Channel():
 				if v.Error != nil {
 					w.SendError(v.Error)
-				} else {
+				} else if v.Value != nil {
 					w.SendValue(v.Value)
 					if v.Value.Reason == "SuccessfulCreate" {
 						return

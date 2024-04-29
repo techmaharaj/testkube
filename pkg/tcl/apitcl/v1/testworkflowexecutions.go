@@ -46,7 +46,6 @@ func (s *apiTCL) StreamTestWorkflowExecutionNotificationsHandler() fiber.Handler
 		if err != nil {
 			return s.BadRequest(c, errPrefix, "fetching job", err)
 		}
-		defer ctrl.StopController()
 
 		// Initiate processing event stream
 		ctx.SetContentType("text/event-stream")
@@ -56,6 +55,7 @@ func (s *apiTCL) StreamTestWorkflowExecutionNotificationsHandler() fiber.Handler
 
 		// Stream the notifications
 		ctx.SetBodyStreamWriter(func(w *bufio.Writer) {
+			defer ctrl.StopController()
 			_ = w.Flush()
 			enc := json.NewEncoder(w)
 
