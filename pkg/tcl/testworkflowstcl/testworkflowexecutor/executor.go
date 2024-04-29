@@ -121,11 +121,11 @@ func (e *executor) Recover(ctx context.Context) {
 
 func (e *executor) Control(ctx context.Context, execution testkube.TestWorkflowExecution) {
 	ctrl, err := testworkflowcontroller.New(ctx, e.clientSet, e.namespace, execution.Id, execution.ScheduledAt)
-	defer ctrl.StopController()
 	if err != nil {
 		e.handleFatalError(execution, err, time.Time{})
 		return
 	}
+	defer ctrl.StopController()
 
 	// Prepare stream for writing log
 	r, writer := io.Pipe()
