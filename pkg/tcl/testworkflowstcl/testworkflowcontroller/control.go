@@ -14,12 +14,12 @@ import (
 	"io"
 	"net/http"
 
-	constants2 "github.com/kubeshop/testkube/cmd/tcl/testworkflow-init/constants"
+	"github.com/kubeshop/testkube/cmd/tcl/testworkflow-init/constants"
 )
 
 func SendControlCommand(ctx context.Context, podIP string, name string, body io.Reader) error {
 	// TODO: add waiting for the started container + retries?
-	r, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://%s:%d/%s", podIP, constants2.ControlServerPort, name), body)
+	r, err := http.NewRequestWithContext(ctx, http.MethodPost, fmt.Sprintf("http://%s:%d/%s", podIP, constants.ControlServerPort, name), body)
 	if err != nil {
 		return err
 	}
