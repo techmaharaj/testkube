@@ -59,12 +59,17 @@ type envImagesConfig struct {
 	InspectorPersistenceCacheKey string `envconfig:"TK_IMG_PK"`
 }
 
+type featuresConfig struct {
+	EnableJUnitParser bool `envconfig:"TK_FF_JUNIT_REPORT" default:"false"`
+}
+
 type envConfig struct {
 	System        envSystemConfig
 	ObjectStorage envObjectStorageConfig
 	Cloud         envCloudConfig
 	Execution     envExecutionConfig
 	Images        envImagesConfig
+	Features      featuresConfig
 }
 
 var cfg envConfig
@@ -81,6 +86,8 @@ func Config() *envConfig {
 		err = envconfig.Process("", &cfg.Execution)
 		ui.ExitOnError("configuring environment", err)
 		err = envconfig.Process("", &cfg.Images)
+		ui.ExitOnError("configuring environment", err)
+		err = envconfig.Process("", &cfg.Features)
 		ui.ExitOnError("configuring environment", err)
 	}
 	cfgLoaded = true
@@ -117,4 +124,8 @@ func WorkflowName() string {
 
 func ExecutionId() string {
 	return Config().Execution.Id
+}
+
+func JUnitParserEnabled() bool {
+	return Config().Features.EnableJUnitParser
 }

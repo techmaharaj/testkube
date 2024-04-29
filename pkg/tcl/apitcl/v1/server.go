@@ -23,25 +23,20 @@ import (
 	"github.com/kubeshop/testkube/pkg/api/v1/testkube"
 	"github.com/kubeshop/testkube/pkg/imageinspector"
 	configRepo "github.com/kubeshop/testkube/pkg/repository/config"
+	"github.com/kubeshop/testkube/pkg/repository/result"
 	"github.com/kubeshop/testkube/pkg/tcl/repositorytcl/testworkflow"
 	"github.com/kubeshop/testkube/pkg/tcl/testworkflowstcl/testworkflowexecutor"
 )
 
 type apiTCL struct {
 	apiv1.TestkubeAPI
-	ProContext                     *config.ProContext
-	ImageInspector                 imageinspector.Inspector
-	TestWorkflowResults            testworkflow.Repository
-	TestWorkflowOutput             testworkflow.OutputRepository
-	TestWorkflowsClient            testworkflowsv1.Interface
-	TestWorkflowTemplatesClient    testworkflowsv1.TestWorkflowTemplatesInterface
-	TestWorkflowExecutor           testworkflowexecutor.TestWorkflowExecutor
-	ApiUrl                         string
-	GlobalTemplateName             string
-	DefaultRegistry                string
-	EnableImageDataPersistentCache bool
-	ImageDataPersistentCacheKey    string
-	configMap                      configRepo.Repository
+	ProContext                  *config.ProContext
+	TestWorkflowResults         testworkflow.Repository
+	TestWorkflowOutput          testworkflow.OutputRepository
+	TestWorkflowsClient         testworkflowsv1.Interface
+	TestWorkflowTemplatesClient testworkflowsv1.TestWorkflowTemplatesInterface
+	TestWorkflowExecutor        testworkflowexecutor.TestWorkflowExecutor
+	configMap                   configRepo.Repository
 }
 
 type ApiTCL interface {
@@ -56,6 +51,7 @@ func NewApiTCL(
 	imageInspector imageinspector.Inspector,
 	testWorkflowResults testworkflow.Repository,
 	testWorkflowOutput testworkflow.OutputRepository,
+	executionResults result.Repository,
 	apiUrl string,
 	globalTemplateName string,
 	defaultRegistry string,
@@ -63,23 +59,20 @@ func NewApiTCL(
 	imageDataPersistentCacheKey string,
 	configMap configRepo.Repository,
 ) ApiTCL {
-	executor := testworkflowexecutor.New(testkubeAPI.Events, testkubeAPI.Clientset, testWorkflowResults, testWorkflowOutput, testkubeAPI.Namespace)
+	testWorkflowTemplatesClient := testworkflowsv1.NewTestWorkflowTemplatesClient(kubeClient, testkubeAPI.Namespace)
+	executor := testworkflowexecutor.New(testkubeAPI.Events, testkubeAPI.Clientset, testWorkflowResults, testWorkflowOutput,
+		testWorkflowTemplatesClient, imageInspector, configMap, executionResults, globalTemplateName,
+		testkubeAPI.Namespace, apiUrl, defaultRegistry, enableImageDataPersistentCache, imageDataPersistentCacheKey)
 	go executor.Recover(context.Background())
 	return &apiTCL{
-		TestkubeAPI:                    testkubeAPI,
-		ProContext:                     proContext,
-		ImageInspector:                 imageInspector,
-		TestWorkflowResults:            testWorkflowResults,
-		TestWorkflowOutput:             testWorkflowOutput,
-		TestWorkflowsClient:            testworkflowsv1.NewClient(kubeClient, testkubeAPI.Namespace),
-		TestWorkflowTemplatesClient:    testworkflowsv1.NewTestWorkflowTemplatesClient(kubeClient, testkubeAPI.Namespace),
-		TestWorkflowExecutor:           executor,
-		ApiUrl:                         apiUrl,
-		GlobalTemplateName:             globalTemplateName,
-		DefaultRegistry:                defaultRegistry,
-		EnableImageDataPersistentCache: enableImageDataPersistentCache,
-		ImageDataPersistentCacheKey:    imageDataPersistentCacheKey,
-		configMap:                      configMap,
+		TestkubeAPI:                 testkubeAPI,
+		ProContext:                  proContext,
+		TestWorkflowResults:         testWorkflowResults,
+		TestWorkflowOutput:          testWorkflowOutput,
+		TestWorkflowsClient:         testworkflowsv1.NewClient(kubeClient, testkubeAPI.Namespace),
+		TestWorkflowTemplatesClient: testWorkflowTemplatesClient,
+		TestWorkflowExecutor:        executor,
+		configMap:                   configMap,
 	}
 }
 

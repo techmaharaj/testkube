@@ -155,7 +155,6 @@ func (w *watcher[T]) _send(v WatcherValue[T]) {
 
 func (w *watcher[T]) SendValue(value T) {
 	w._send(WatcherValue[T]{Value: value})
-
 }
 
 func (w *watcher[T]) SendError(err error) {
