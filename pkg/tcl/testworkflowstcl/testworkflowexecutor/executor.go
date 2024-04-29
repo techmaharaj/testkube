@@ -121,6 +121,7 @@ func (e *executor) Recover(ctx context.Context) {
 
 func (e *executor) Control(ctx context.Context, execution testkube.TestWorkflowExecution) {
 	ctrl, err := testworkflowcontroller.New(ctx, e.clientSet, e.namespace, execution.Id, execution.ScheduledAt)
+	defer ctrl.StopController()
 	if err != nil {
 		e.handleFatalError(execution, err, time.Time{})
 		return
@@ -180,6 +181,7 @@ func (e *executor) Control(ctx context.Context, execution testkube.TestWorkflowE
 				e.handleFatalError(execution, testworkflowcontroller.ErrJobAborted, abortedAt)
 			} else {
 				// Handle unknown state
+				ctrl.StopController()
 				ctrl, err = testworkflowcontroller.New(ctx, e.clientSet, e.namespace, execution.Id, execution.ScheduledAt)
 				if err == nil {
 					for v := range ctrl.Watch(ctx).Stream(ctx).Channel() {

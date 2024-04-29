@@ -46,6 +46,7 @@ func (s *apiTCL) StreamTestWorkflowExecutionNotificationsHandler() fiber.Handler
 		if err != nil {
 			return s.BadRequest(c, errPrefix, "fetching job", err)
 		}
+		defer ctrl.StopController()
 
 		// Initiate processing event stream
 		ctx.SetContentType("text/event-stream")
@@ -95,6 +96,7 @@ func (s *apiTCL) StreamTestWorkflowExecutionNotificationsWebSocketHandler() fibe
 		if err != nil {
 			return
 		}
+		defer ctrl.StopController()
 
 		for n := range ctrl.Watch(ctx).Stream(ctx).Channel() {
 			if n.Error == nil {
@@ -237,6 +239,7 @@ func (s *apiTCL) AbortTestWorkflowExecutionHandler() fiber.Handler {
 		if err != nil {
 			return s.BadRequest(c, errPrefix, "fetching job", err)
 		}
+		defer ctrl.StopController()
 
 		// Abort the execution
 		err = ctrl.Abort(context.Background())
@@ -277,6 +280,7 @@ func (s *apiTCL) PauseTestWorkflowExecutionHandler() fiber.Handler {
 		if err != nil {
 			return s.BadRequest(c, errPrefix, "fetching job", err)
 		}
+		defer ctrl.StopController()
 
 		// Resuming the execution
 		err = ctrl.Pause(context.Background())
@@ -317,6 +321,7 @@ func (s *apiTCL) ResumeTestWorkflowExecutionHandler() fiber.Handler {
 		if err != nil {
 			return s.BadRequest(c, errPrefix, "fetching job", err)
 		}
+		defer ctrl.StopController()
 
 		// Resuming the execution
 		err = ctrl.Resume(context.Background())
@@ -357,8 +362,10 @@ func (s *apiTCL) AbortAllTestWorkflowExecutionsHandler() fiber.Handler {
 			// Abort the execution
 			err = ctrl.Abort(context.Background())
 			if err != nil {
+				ctrl.StopController()
 				return s.ClientError(c, errPrefix, err)
 			}
+			ctrl.StopController()
 		}
 
 		c.Status(http.StatusNoContent)
@@ -455,6 +462,7 @@ func (s *apiTCL) GetTestWorkflowNotificationsStream(ctx context.Context, executi
 	if err != nil {
 		return nil, err
 	}
+	defer ctrl.StopController()
 
 	// Stream the notifications
 	ch := make(chan testkube.TestWorkflowExecutionNotification)

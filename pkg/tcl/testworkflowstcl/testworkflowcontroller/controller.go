@@ -41,6 +41,7 @@ type Controller interface {
 	Resume(ctx context.Context) error
 	Cleanup(ctx context.Context) error
 	Watch(ctx context.Context) Watcher[Notification]
+	StopController()
 }
 
 func New(parentCtx context.Context, clientSet kubernetes.Interface, namespace, id string, scheduledAt time.Time) (Controller, error) {
@@ -146,6 +147,10 @@ func (c *controller) Resume(ctx context.Context) error {
 		return err
 	}
 	return Resume(ctx, podIP)
+}
+
+func (c *controller) StopController() {
+	c.ctxCancel()
 }
 
 func (c *controller) Watch(parentCtx context.Context) Watcher[Notification] {

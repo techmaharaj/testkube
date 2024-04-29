@@ -320,6 +320,9 @@ func NewParallelCmd() *cobra.Command {
 
 					// Delete obsolete data
 					if update.done || update.err != nil {
+						if _, ok := controllers[update.index]; ok {
+							controllers[update.index].StopController()
+						}
 						delete(controllers, update.index)
 						delete(statuses, update.index)
 					}
