@@ -11,8 +11,6 @@ package testworkflowcontroller
 import (
 	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"time"
 
 	"github.com/pkg/errors"
@@ -123,38 +121,31 @@ func (c *controller) Cleanup(ctx context.Context) error {
 	return Cleanup(ctx, c.clientSet, c.namespace, c.id)
 }
 
-func (c *controller) command(ctx context.Context, name string, body io.Reader) error {
-	// TODO: add waiting for the started container + retries?
+func (c *controller) PodIP(ctx context.Context) (string, error) {
 	v := <-c.pod.Any(ctx)
 	if v.Error != nil {
-		return v.Error
+		return "", v.Error
 	}
 	if v.Value.Status.PodIP == "" {
-		return errors.New("there is no IP assigned to this pod")
+		return "", errors.New("there is no IP assigned to this pod")
 	}
-	r, err := http.NewRequest(http.MethodPost, fmt.Sprintf("http://%s:%d/%s", v.Value.Status.PodIP, constants2.ControlServerPort, name), body)
-	if err != nil {
-		return err
-	}
-	client := &http.Client{}
-	res, err := client.Do(r)
-	if err != nil {
-		return fmt.Errorf("control server error: %s", err.Error())
-	}
-	defer res.Body.Close()
-	if res.StatusCode != http.StatusNoContent {
-		body, _ := io.ReadAll(res.Body)
-		return fmt.Errorf("control server error: status %d: %s", res.StatusCode, string(body))
-	}
-	return nil
+	return v.Value.Status.PodIP, nil
 }
 
 func (c *controller) Pause(ctx context.Context) error {
-	return c.command(ctx, "pause", nil)
+	podIP, err := c.PodIP(ctx)
+	if err != nil {
+		return err
+	}
+	return Pause(ctx, podIP)
 }
 
 func (c *controller) Resume(ctx context.Context) error {
-	return c.command(ctx, "resume", nil)
+	podIP, err := c.PodIP(ctx)
+	if err != nil {
+		return err
+	}
+	return Resume(ctx, podIP)
 }
 
 func (c *controller) Watch(parentCtx context.Context) Watcher[Notification] {
