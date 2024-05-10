@@ -42,7 +42,7 @@ func (s *apiTCL) StreamTestWorkflowExecutionNotificationsHandler() fiber.Handler
 		}
 
 		// Check for the logs
-		ctrl, err := testworkflowcontroller.New(ctx, s.Clientset, execution.Namespace, execution.Id, execution.ScheduledAt)
+		ctrl, err := testworkflowcontroller.New(ctx, s.Clientset, execution.GetNamespace(s.Namespace), execution.Id, execution.ScheduledAt)
 		if err != nil {
 			return s.BadRequest(c, errPrefix, "fetching job", err)
 		}
@@ -65,6 +65,7 @@ func (s *apiTCL) StreamTestWorkflowExecutionNotificationsHandler() fiber.Handler
 					_ = w.Flush()
 				}
 			}
+			ctrl.StopController()
 		})
 
 		return nil
@@ -91,7 +92,7 @@ func (s *apiTCL) StreamTestWorkflowExecutionNotificationsWebSocketHandler() fibe
 		}
 
 		// Check for the logs TODO: Load from the database if possible
-		ctrl, err := testworkflowcontroller.New(ctx, s.Clientset, execution.Namespace, execution.Id, execution.ScheduledAt)
+		ctrl, err := testworkflowcontroller.New(ctx, s.Clientset, execution.GetNamespace(s.Namespace), execution.Id, execution.ScheduledAt)
 		if err != nil {
 			return
 		}
@@ -101,6 +102,7 @@ func (s *apiTCL) StreamTestWorkflowExecutionNotificationsWebSocketHandler() fibe
 				_ = c.WriteJSON(n.Value)
 			}
 		}
+		ctrl.StopController()
 	})
 }
 
@@ -233,7 +235,7 @@ func (s *apiTCL) AbortTestWorkflowExecutionHandler() fiber.Handler {
 		}
 
 		// Obtain the controller
-		ctrl, err := testworkflowcontroller.New(ctx, s.Clientset, execution.Namespace, execution.Id, execution.ScheduledAt)
+		ctrl, err := testworkflowcontroller.New(ctx, s.Clientset, execution.GetNamespace(s.Namespace), execution.Id, execution.ScheduledAt)
 		if err != nil {
 			return s.BadRequest(c, errPrefix, "fetching job", err)
 		}
@@ -273,7 +275,7 @@ func (s *apiTCL) PauseTestWorkflowExecutionHandler() fiber.Handler {
 		}
 
 		// Obtain the controller
-		ctrl, err := testworkflowcontroller.New(ctx, s.Clientset, execution.Namespace, execution.Id, execution.ScheduledAt)
+		ctrl, err := testworkflowcontroller.New(ctx, s.Clientset, execution.GetNamespace(s.Namespace), execution.Id, execution.ScheduledAt)
 		if err != nil {
 			return s.BadRequest(c, errPrefix, "fetching job", err)
 		}
@@ -313,11 +315,11 @@ func (s *apiTCL) ResumeTestWorkflowExecutionHandler() fiber.Handler {
 		}
 
 		// Obtain the controller
-		ctrl, err := testworkflowcontroller.New(ctx, s.Clientset, execution.Namespace, execution.Id, execution.ScheduledAt)
-		defer ctrl.StopController()
+		ctrl, err := testworkflowcontroller.New(ctx, s.Clientset, execution.GetNamespace(s.Namespace), execution.Id, execution.ScheduledAt)
 		if err != nil {
 			return s.BadRequest(c, errPrefix, "fetching job", err)
 		}
+		defer ctrl.StopController()
 
 		// Resuming the execution
 		err = ctrl.Resume(ctx)
@@ -350,18 +352,17 @@ func (s *apiTCL) AbortAllTestWorkflowExecutionsHandler() fiber.Handler {
 
 		for _, execution := range executions {
 			// Obtain the controller
-			ctrl, err := testworkflowcontroller.New(ctx, s.Clientset, execution.Namespace, execution.Id, execution.ScheduledAt)
-			defer ctrl.StopController()
+			ctrl, err := testworkflowcontroller.New(ctx, s.Clientset, execution.GetNamespace(s.Namespace), execution.Id, execution.ScheduledAt)
 			if err != nil {
 				return s.BadRequest(c, errPrefix, "fetching job", err)
 			}
+			defer ctrl.StopController()
 
 			// Abort the execution
 			err = ctrl.Abort(ctx)
 			if err != nil {
 				return s.ClientError(c, errPrefix, err)
 			}
-			ctrl.StopController()
 		}
 
 		c.Status(http.StatusNoContent)
@@ -454,11 +455,10 @@ func (s *apiTCL) GetTestWorkflowNotificationsStream(ctx context.Context, executi
 	}
 
 	// Check for the logs
-	ctrl, err := testworkflowcontroller.New(ctx, s.Clientset, execution.Namespace, execution.Id, execution.ScheduledAt)
+	ctrl, err := testworkflowcontroller.New(ctx, s.Clientset, execution.GetNamespace(s.Namespace), execution.Id, execution.ScheduledAt)
 	if err != nil {
 		return nil, err
 	}
-	defer ctrl.StopController()
 
 	// Stream the notifications
 	ch := make(chan testkube.TestWorkflowExecutionNotification)

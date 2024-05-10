@@ -249,6 +249,7 @@ func NewParallelCmd() *cobra.Command {
 					return false
 				}
 				defer func() {
+					// TODO: Handle job.namespace
 					err := testworkflowcontroller.Cleanup(context.Background(), clientSet, env.Namespace(), id) // TODO: Think of resourceSuffix
 					if err != nil {
 						fmt.Printf("worker %d: warning: problem cleaning up resources: %s\n", index+1, err.Error())
@@ -290,7 +291,7 @@ func NewParallelCmd() *cobra.Command {
 
 				// TODO: Add support for watching only result
 				prevStatus := testkube.QUEUED_TestWorkflowStatus
-				for v := range ctrl.Watch(context.Background()).Stream(context.Background()).Channel() {
+				for v := range ctrl.Watch(context.Background()) {
 					if v.Error != nil {
 						fmt.Printf("worker %d: error: %s\n", index+1, v.Error.Error())
 					} else if v.Value.Result != nil {

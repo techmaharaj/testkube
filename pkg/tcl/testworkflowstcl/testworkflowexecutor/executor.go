@@ -149,7 +149,7 @@ func (e *executor) handleFatalError(execution *testkube.TestWorkflowExecution, e
 		log.DefaultLogger.Errorf("failed to save fatal error for execution %s: %v", execution.Id, err)
 	}
 	e.emitter.Notify(testkube.NewEventEndTestWorkflowFailed(execution))
-	go testworkflowcontroller.Cleanup(context.Background(), e.clientSet, execution.Namespace, execution.Id)
+	go testworkflowcontroller.Cleanup(context.Background(), e.clientSet, execution.GetNamespace(e.namespace), execution.Id)
 }
 
 func (e *executor) Recover(ctx context.Context) {
@@ -168,7 +168,7 @@ func (e *executor) Recover(ctx context.Context) {
 }
 
 func (e *executor) Control(ctx context.Context, execution *testkube.TestWorkflowExecution) error {
-	ctrl, err := testworkflowcontroller.New(ctx, e.clientSet, execution.Namespace, execution.Id, execution.ScheduledAt)
+	ctrl, err := testworkflowcontroller.New(ctx, e.clientSet, execution.GetNamespace(e.namespace), execution.Id, execution.ScheduledAt)
 	if err != nil {
 		log.DefaultLogger.Errorw("failed to control the TestWorkflow", "id", execution.Id, "error", err)
 		return err
@@ -231,7 +231,7 @@ func (e *executor) Control(ctx context.Context, execution *testkube.TestWorkflow
 			} else {
 				// Handle unknown state
 				ctrl.StopController()
-				ctrl, err = testworkflowcontroller.New(ctx, e.clientSet, execution.Namespace, execution.Id, execution.ScheduledAt)
+				ctrl, err = testworkflowcontroller.New(ctx, e.clientSet, execution.GetNamespace(e.namespace), execution.Id, execution.ScheduledAt)
 				if err == nil {
 					for v := range ctrl.Watch(ctx) {
 						if v.Error != nil || v.Value.Output == nil {
@@ -279,7 +279,7 @@ func (e *executor) Control(ctx context.Context, execution *testkube.TestWorkflow
 
 	wg.Wait()
 
-	err = testworkflowcontroller.Cleanup(ctx, e.clientSet, execution.Namespace, execution.Id)
+	err = testworkflowcontroller.Cleanup(ctx, e.clientSet, execution.GetNamespace(e.namespace), execution.Id)
 	if err != nil {
 		log.DefaultLogger.Errorw("failed to cleanup TestWorkflow resources", "id", execution.Id, "error", err)
 	}
@@ -383,7 +383,7 @@ func (e *executor) Execute(ctx context.Context, workflow testworkflowsv1.TestWor
 			"dashboard.url":   os.Getenv("TESTKUBE_DASHBOARD_URI"),
 			"api.url":         e.apiUrl,
 			"namespace":       namespace,
-		    "defaultRegistry": e.defaultRegistry,
+			"defaultRegistry": e.defaultRegistry,
 
 			"images.init":                constants.DefaultInitImage,
 			"images.toolkit":             constants.DefaultToolkitImage,
