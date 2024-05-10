@@ -67,10 +67,10 @@ type executor struct {
 	globalTemplateName             string
 	apiUrl                         string
 	namespace                      string
-	serviceAccountNames            map[string]string
 	defaultRegistry                string
 	enableImageDataPersistentCache bool
 	imageDataPersistentCacheKey    string
+	serviceAccountNames            map[string]string
 }
 
 func New(emitter *event.Emitter,
