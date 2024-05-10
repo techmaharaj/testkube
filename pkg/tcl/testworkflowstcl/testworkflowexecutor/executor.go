@@ -35,10 +35,10 @@ import (
 	"github.com/kubeshop/testkube/pkg/log"
 	configRepo "github.com/kubeshop/testkube/pkg/repository/config"
 	"github.com/kubeshop/testkube/pkg/repository/result"
-	"github.com/kubeshop/testkube/pkg/tcl/commontcl"
 	"github.com/kubeshop/testkube/pkg/tcl/expressionstcl"
 	testworkflowmappers "github.com/kubeshop/testkube/pkg/tcl/mapperstcl/testworkflows"
 	"github.com/kubeshop/testkube/pkg/tcl/repositorytcl/testworkflow"
+	"github.com/kubeshop/testkube/pkg/tcl/testworkflowstcl"
 	"github.com/kubeshop/testkube/pkg/tcl/testworkflowstcl/testworkflowcontroller"
 	"github.com/kubeshop/testkube/pkg/tcl/testworkflowstcl/testworkflowprocessor"
 	"github.com/kubeshop/testkube/pkg/tcl/testworkflowstcl/testworkflowprocessor/constants"
@@ -49,7 +49,6 @@ import (
 
 //go:generate mockgen -destination=./mock_executor.go -package=testworkflowexecutor "github.com/kubeshop/testkube/pkg/tcl/testworkflowstcl/testworkflowexecutor" TestWorkflowExecutor
 type TestWorkflowExecutor interface {
-	Schedule(bundle *testworkflowprocessor.Bundle, execution testkube.TestWorkflowExecution)
 	Control(ctx context.Context, execution *testkube.TestWorkflowExecution) error
 	Recover(ctx context.Context)
 	Execute(ctx context.Context, workflow testworkflowsv1.TestWorkflow, request testkube.TestWorkflowExecutionRequest) (
@@ -68,6 +67,7 @@ type executor struct {
 	globalTemplateName             string
 	apiUrl                         string
 	namespace                      string
+	serviceAccountNames            map[string]string
 	defaultRegistry                string
 	enableImageDataPersistentCache bool
 	imageDataPersistentCacheKey    string
@@ -81,8 +81,13 @@ func New(emitter *event.Emitter,
 	imageInspector imageinspector.Inspector,
 	configMap configRepo.Repository,
 	executionResults result.Repository,
+	serviceAccountNames map[string]string,
 	globalTemplateName, namespace, apiUrl, defaultRegistry string,
 	enableImageDataPersistentCache bool, imageDataPersistentCacheKey string) TestWorkflowExecutor {
+	if serviceAccountNames == nil {
+		serviceAccountNames = make(map[string]string)
+	}
+
 	return &executor{
 		emitter:                        emitter,
 		clientSet:                      clientSet,
@@ -92,6 +97,7 @@ func New(emitter *event.Emitter,
 		imageInspector:                 imageInspector,
 		configMap:                      configMap,
 		executionResults:               executionResults,
+		serviceAccountNames:            serviceAccountNames,
 		globalTemplateName:             globalTemplateName,
 		apiUrl:                         apiUrl,
 		namespace:                      namespace,
@@ -101,42 +107,25 @@ func New(emitter *event.Emitter,
 	}
 }
 
-func (e *executor) Schedule(bundle *testworkflowprocessor.Bundle, execution testkube.TestWorkflowExecution) {
-	// Inform about execution start
-	e.emitter.Notify(testkube.NewEventQueueTestWorkflow(&execution))
-
-	// Deploy required resources
-	err := e.Deploy(context.Background(), bundle)
-	if err != nil {
-		e.handleFatalError(&execution, err, time.Time{})
-		return
+func (e *executor) Deploy(ctx context.Context, bundle *testworkflowprocessor.Bundle) (err error) {
+	namespace := e.namespace
+	if bundle.Job.Namespace != "" {
+		namespace = bundle.Job.Namespace
 	}
 
-	// Start to control the results
-	go func() {
-		err = e.Control(context.Background(), &execution)
-		if err != nil {
-			e.handleFatalError(&execution, err, time.Time{})
-			return
-		}
-
-	}()
-}
-
-func (e *executor) Deploy(ctx context.Context, bundle *testworkflowprocessor.Bundle) (err error) {
 	for _, item := range bundle.Secrets {
-		_, err = e.clientSet.CoreV1().Secrets(e.namespace).Create(ctx, &item, metav1.CreateOptions{})
+		_, err = e.clientSet.CoreV1().Secrets(namespace).Create(ctx, &item, metav1.CreateOptions{})
 		if err != nil {
 			return
 		}
 	}
 	for _, item := range bundle.ConfigMaps {
-		_, err = e.clientSet.CoreV1().ConfigMaps(e.namespace).Create(ctx, &item, metav1.CreateOptions{})
+		_, err = e.clientSet.CoreV1().ConfigMaps(namespace).Create(ctx, &item, metav1.CreateOptions{})
 		if err != nil {
 			return
 		}
 	}
-	_, err = e.clientSet.BatchV1().Jobs(e.namespace).Create(ctx, &bundle.Job, metav1.CreateOptions{})
+	_, err = e.clientSet.BatchV1().Jobs(namespace).Create(ctx, &bundle.Job, metav1.CreateOptions{})
 	return
 }
 
@@ -149,7 +138,7 @@ func (e *executor) handleFatalError(execution *testkube.TestWorkflowExecution, e
 	if ts.IsZero() {
 		ts = time.Now()
 		if isAborted || isTimeout {
-			ts = ts.Truncate(testworkflowcontroller.JobRetrievalTimeout)
+			ts = ts.Truncate(testworkflowcontroller.DefaultInitTimeout)
 		}
 	}
 
@@ -160,7 +149,7 @@ func (e *executor) handleFatalError(execution *testkube.TestWorkflowExecution, e
 		log.DefaultLogger.Errorf("failed to save fatal error for execution %s: %v", execution.Id, err)
 	}
 	e.emitter.Notify(testkube.NewEventEndTestWorkflowFailed(execution))
-	go testworkflowcontroller.Cleanup(context.Background(), e.clientSet, e.namespace, execution.Id)
+	go testworkflowcontroller.Cleanup(context.Background(), e.clientSet, execution.Namespace, execution.Id)
 }
 
 func (e *executor) Recover(ctx context.Context) {
@@ -169,14 +158,19 @@ func (e *executor) Recover(ctx context.Context) {
 		return
 	}
 	for i := range list {
-		e.Control(context.Background(), &list[i])
+		go func(execution *testkube.TestWorkflowExecution) {
+			err := e.Control(context.Background(), execution)
+			if err != nil {
+				e.handleFatalError(execution, err, time.Time{})
+			}
+		}(&list[i])
 	}
 }
 
 func (e *executor) Control(ctx context.Context, execution *testkube.TestWorkflowExecution) error {
-	ctrl, err := testworkflowcontroller.New(ctx, e.clientSet, e.namespace, execution.Id, execution.ScheduledAt)
+	ctrl, err := testworkflowcontroller.New(ctx, e.clientSet, execution.Namespace, execution.Id, execution.ScheduledAt)
 	if err != nil {
-		log.DefaultLogger.Errorw("failed to save TestWorkflow log output", "id", execution.Id, "error", err)
+		log.DefaultLogger.Errorw("failed to control the TestWorkflow", "id", execution.Id, "error", err)
 		return err
 	}
 	defer ctrl.StopController()
@@ -191,8 +185,9 @@ func (e *executor) Control(ctx context.Context, execution *testkube.TestWorkflow
 	go func() {
 		defer wg.Done()
 
-		for v := range ctrl.Watch(ctx).Stream(ctx).Channel() {
+		for v := range ctrl.Watch(ctx) {
 			if v.Error != nil {
+				log.DefaultLogger.Errorw("error from TestWorkflow watcher", "id", execution.Id, "error", v.Error)
 				continue
 			}
 			if v.Value.Output != nil {
@@ -236,9 +231,9 @@ func (e *executor) Control(ctx context.Context, execution *testkube.TestWorkflow
 			} else {
 				// Handle unknown state
 				ctrl.StopController()
-				ctrl, err = testworkflowcontroller.New(ctx, e.clientSet, e.namespace, execution.Id, execution.ScheduledAt)
+				ctrl, err = testworkflowcontroller.New(ctx, e.clientSet, execution.Namespace, execution.Id, execution.ScheduledAt)
 				if err == nil {
-					for v := range ctrl.Watch(ctx).Stream(ctx).Channel() {
+					for v := range ctrl.Watch(ctx) {
 						if v.Error != nil || v.Value.Output == nil {
 							continue
 						}
@@ -284,7 +279,7 @@ func (e *executor) Control(ctx context.Context, execution *testkube.TestWorkflow
 
 	wg.Wait()
 
-	err = testworkflowcontroller.Cleanup(ctx, e.clientSet, e.namespace, execution.Id)
+	err = testworkflowcontroller.Cleanup(ctx, e.clientSet, execution.Namespace, execution.Id)
 	if err != nil {
 		log.DefaultLogger.Errorw("failed to cleanup TestWorkflow resources", "id", execution.Id, "error", err)
 	}
@@ -353,6 +348,15 @@ func (e *executor) Execute(ctx context.Context, workflow testworkflowsv1.TestWor
 		}
 	}
 
+	namespace := e.namespace
+	if workflow.Spec.Job != nil && workflow.Spec.Job.Namespace != "" {
+		namespace = workflow.Spec.Job.Namespace
+	}
+
+	if _, ok := e.serviceAccountNames[namespace]; !ok {
+		return execution, fmt.Errorf("not supported execution namespace %s", namespace)
+	}
+
 	// Build the basic Execution data
 	id := primitive.NewObjectID().Hex()
 	now := time.Now()
@@ -378,8 +382,8 @@ func (e *executor) Execute(ctx context.Context, workflow testworkflowsv1.TestWor
 
 			"dashboard.url":   os.Getenv("TESTKUBE_DASHBOARD_URI"),
 			"api.url":         e.apiUrl,
-			"namespace":       e.namespace,
-			"defaultRegistry": e.defaultRegistry,
+			"namespace":       namespace,
+		    "defaultRegistry": e.defaultRegistry,
 
 			"images.init":                constants.DefaultInitImage,
 			"images.toolkit":             constants.DefaultToolkitImage,
@@ -423,6 +427,7 @@ func (e *executor) Execute(ctx context.Context, workflow testworkflowsv1.TestWor
 	execution = testkube.TestWorkflowExecution{
 		Id:          id,
 		Name:        executionName,
+		Namespace:   namespace,
 		Number:      number,
 		ScheduledAt: now,
 		StatusAt:    now,
@@ -451,7 +456,7 @@ func (e *executor) Execute(ctx context.Context, workflow testworkflowsv1.TestWor
 	err = e.Deploy(context.Background(), bundle)
 	if err != nil {
 		e.handleFatalError(&execution, err, time.Time{})
-		return execution, errors.Wrap(err, "deploying reqyuired resources")
+		return execution, errors.Wrap(err, "deploying required resources")
 	}
 
 	e.sendRunWorkflowTelemetry(ctx, &workflow)
@@ -484,16 +489,16 @@ func (e *executor) sendRunWorkflowTelemetry(ctx context.Context, workflow *testw
 	out, err := telemetry.SendRunWorkflowEvent("testkube_api_run_test_workflow", telemetry.RunWorkflowParams{
 		RunParams: telemetry.RunParams{
 			AppVersion: version.Version,
-			DataSource: commontcl.GetDataSource(workflow.Spec.Content),
-			Host:       commontcl.GetHostname(),
-			ClusterID:  commontcl.GetClusterID(ctx, e.configMap),
+			DataSource: testworkflowstcl.GetDataSource(workflow.Spec.Content),
+			Host:       testworkflowstcl.GetHostname(),
+			ClusterID:  testworkflowstcl.GetClusterID(ctx, e.configMap),
 		},
 		WorkflowParams: telemetry.WorkflowParams{
 			TestWorkflowSteps:        int32(len(workflow.Spec.Setup) + len(workflow.Spec.Steps) + len(workflow.Spec.After)),
-			TestWorkflowImage:        commontcl.GetImage(workflow.Spec.Container),
-			TestWorkflowArtifactUsed: commontcl.HasWorkflowStepLike(workflow.Spec, commontcl.HasArtifacts),
-			TestWorkflowKubeshopGitURI: commontcl.IsKubeshopGitURI(workflow.Spec.Content) ||
-				commontcl.HasWorkflowStepLike(workflow.Spec, commontcl.HasKubeshopGitURI),
+			TestWorkflowImage:        testworkflowstcl.GetImage(workflow.Spec.Container),
+			TestWorkflowArtifactUsed: testworkflowstcl.HasWorkflowStepLike(workflow.Spec, testworkflowstcl.HasArtifacts),
+			TestWorkflowKubeshopGitURI: testworkflowstcl.IsKubeshopGitURI(workflow.Spec.Content) ||
+				testworkflowstcl.HasWorkflowStepLike(workflow.Spec, testworkflowstcl.HasKubeshopGitURI),
 		},
 	})
 

@@ -317,9 +317,11 @@ func (p *processor) Bundle(ctx context.Context, workflow *testworkflowsv1.TestWo
 			Name:        "{{execution.id}}{{resourceSuffix}}", // TODO: Add resourceSuffix in other places too
 			Annotations: jobConfig.Annotations,
 			Labels:      jobConfig.Labels,
+			Namespace:   jobConfig.Namespace,
 		},
 		Spec: batchv1.JobSpec{
-			BackoffLimit: common.Ptr(int32(0)),
+			BackoffLimit:          common.Ptr(int32(0)),
+			ActiveDeadlineSeconds: jobConfig.ActiveDeadlineSeconds,
 		},
 	}
 	AnnotateControlledBy(&jobSpec, "{{execution.id}}")

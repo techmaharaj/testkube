@@ -74,6 +74,12 @@ func MergeJobConfig(dst, include *testworkflowsv1.JobConfig) *testworkflowsv1.Jo
 	}
 	dst.Labels = MergeMap(dst.Labels, include.Labels)
 	dst.Annotations = MergeMap(dst.Annotations, include.Annotations)
+	if include.Namespace != "" {
+		dst.Namespace = include.Namespace
+	}
+	if include.ActiveDeadlineSeconds != nil {
+		dst.ActiveDeadlineSeconds = include.ActiveDeadlineSeconds
+	}
 	return dst
 }
 
