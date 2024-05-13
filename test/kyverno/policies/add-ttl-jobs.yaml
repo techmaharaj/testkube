@@ -1,8 +1,7 @@
 apiVersion: kyverno.io/v1
-kind: Policy
+kind: ClusterPolicy
 metadata:
   name: add-ttl-jobs
-  namespace: testkube-enterprise-agent
   annotations:
     policies.kyverno.io/title: Add TTL to Jobs
     policies.kyverno.io/category: Other
@@ -34,6 +33,3 @@ spec:
         patchStrategicMerge:
           spec:
             +(ttlSecondsAfterFinished): 900
-
-
-#This policy adds the ttlSecondsAfterFinished field to a Job that does not have an ownerReference set if not already specified
