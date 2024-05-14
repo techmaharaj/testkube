@@ -1,0 +1,13 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: services-test
+spec:
+  steps:
+  - try:
+    - assert:
+        file: ../../resources/services/kube-prometheus-stack-grafana.yaml 
+    - assert:
+        file: ../../resources/services/kube-prometheus-stack-prometheus.yaml
+    - assert:
+        file: ../../resources/services/kube-prometheus-stack-operator.yaml

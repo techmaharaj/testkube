@@ -1,0 +1,17 @@
+apiVersion: chainsaw.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: hpa-test
+spec:
+  steps:
+  - try:
+    - script:
+        content: kubectl version
+        check:
+          (contains($stdout, '1.28')): true
+  - try:
+    - apply:
+        file: ../../resources/hpa/hpa.yaml
+  - try:
+    - assert:
+        file: ../../resources/hpa/hpa-assert.yaml
