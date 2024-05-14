@@ -8,7 +8,7 @@ spec:
     - script:
         content: kubectl version
         check:
-          (contains($stdout, '1.28')): true
+          (contains($stdout, '1.29')): true
   - try:
     - apply:
         file: ../../resources/hpa/hpa.yaml
