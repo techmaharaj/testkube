@@ -15,10 +15,10 @@ metadata:
       specifies a tag and that it is not called `latest`.
 spec:
   validationFailureAction: audit
-  background: true
+  background: true # periodically scan existing resources and create a report
   rules:
     - name: validate-image-tag
-      match:
+      match: # or exclude
         any:
           - resources:
               kinds:
