@@ -26,6 +26,7 @@ spec:
               kinds:
                 - Deployment
                 - Pod
+                - Job
       validate:
         message: "CPU and memory resource requests and limits are required."
         pattern:
