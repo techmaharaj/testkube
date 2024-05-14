@@ -6,7 +6,7 @@ metadata:
   name: web
 spec:
   containers:
-    - image: nginx
+    - image: nginx:1.14.1
       name: web
       resources:
         requests:
